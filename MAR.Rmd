@@ -1,0 +1,2671 @@
+---
+title: "Seguridad y percepción ciudadana en Querétaro"
+author: "Data_Frame,wendolyn Sóstenes Gómez,\nJosé Manuel Flores Reséndiz,\n  Jesús Gabriel Díaz"
+date: "2026-05-03"
+
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    number_sections: false
+    toc_depth: 3
+---
+
+```{css, echo=FALSE}
+body {
+  font-family: "Arial";
+  color: black;
+}
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,      # Oculta el código fuente en el reporte HTML final
+  warning = FALSE,   # Evita que se muestren advertencias de librerías o funciones
+  message = FALSE,   # Oculta mensajes de carga de paquetes o uniones (joins)
+  fig.width = 10,    # Ancho estándar para las visualizaciones
+  fig.height = 8     # Alto estándar para mantener la proporción de los gráficos
+)
+
+library(tidyr)
+library(stringi)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(knitr)
+
+```
+## [Índice]{style="color:#1F4E79; font-weight:bold;"}
+
+<div style="margin-left:20px; line-height:1.8;">
+
+<b>1.</b> Introducción  
+
+<b>2.</b> Percepción ciudadana sobre seguridad y confianza social  
+&nbsp;&nbsp;&nbsp;&nbsp;2.1 Corrupción  
+&nbsp;&nbsp;&nbsp;&nbsp;2.2 Guardia Nacional  
+&nbsp;&nbsp;&nbsp;&nbsp;2.3 Percepción sobre la seguridad al caminar por las noches  
+&nbsp;&nbsp;&nbsp;&nbsp;2.4 Percepción futura sobre la seguridad pública en su colonia  
+&nbsp;&nbsp;&nbsp;&nbsp;2.5 Confianza vecinal  
+
+<b>3.</b> Impacto de la delincuencia en actividades cotidianas  
+&nbsp;&nbsp;&nbsp;&nbsp;3.1 Trabajo inseguro  
+&nbsp;&nbsp;&nbsp;&nbsp;3.2 Abandono escolar por temor a ser víctimas de la delincuencia  
+&nbsp;&nbsp;&nbsp;&nbsp;3.3 Robo de celular  
+
+<b>4.</b> Estrategias de prevención y respuesta comunitaria  
+&nbsp;&nbsp;&nbsp;&nbsp;4.1 Adquirir un perro guardián  
+&nbsp;&nbsp;&nbsp;&nbsp;4.2 Organización vecinal por alumbrado  
+
+<b>5.</b> Conclusiones  
+
+<b>6.</b> Referencias  
+
+</div>
+
+## [1.Introducción ]{style="color:#1F4E79; font-weight:bold;"}
+
+La seguridad pública constituye una dimensión fundamental para el bienestar social y el desarrollo territorial. Su análisis no se limita a la incidencia delictiva registrada por las instituciones, sino que también incluye la percepción ciudadana, la experiencia de victimización y las medidas preventivas adoptadas por la población ante situaciones de riesgo.
+
+En este contexto, el Instituto Nacional de Estadística y Geografía (INEGI), a través de la Encuesta Nacional de Victimización y Percepción sobre Seguridad Pública (ENVIPE), genera información estadística que permite conocer cómo la población percibe la seguridad, cuáles son los delitos más frecuentes y qué estrategias implementan los hogares para protegerse.
+
+El presente documento analiza diversos indicadores seleccionados de la ENVIPE para el periodo 2021–2025, con énfasis en el estado de Querétaro. Sin embargo, es importante señalar que la ENVIPE no está diseñada para representar estadísticamente a todos los municipios del estado, sino únicamente a las denominadas Áreas Urbanas de Interés definidas por el INEGI. En el caso de Querétaro, la encuesta considera principalmente los municipios de Querétaro, Corregidora y El Marqués, debido a su integración dentro de la zona metropolitana y a su alta concentración poblacional.
+
+Por esta razón, el análisis presentado se limita a estos tres municipios, ya que los factores de expansión y el diseño muestral de la ENVIPE solo permiten realizar inferencias válidas para dichas áreas urbanas. Aunque existen registros individuales de otras localidades, estos no cuentan con representatividad estadística suficiente para expandirse a nivel municipal, por lo que utilizarlos con ese fin podría generar interpretaciones sesgadas o resultados poco confiables.
+
+De esta manera, el estudio busca identificar patrones territoriales y diferencias locales en materia de percepción de inseguridad, victimización y medidas de prevención dentro de las áreas urbanas de interés consideradas por la encuesta en el estado de Querétaro.
+
+## [2. Percepción ciudadana sobre seguridad y confianza social]{style="color:#1F4E79; font-weight:bold;"}
+
+## [2.1 Corrupción]{style="color:#444444; font-weight:bold;"}
+
+
+La percepción social de la seguridad permite identificar cómo la ciudadanía interpreta su entorno y la actuación de las instituciones. (La pregunta indagó sobre las tres problemáticas de mayor preocupación; los datos se presentan por la frecuencia de las menciones sin el orden. A nivel nacional 94 525 160 casos mencionan tres, 405 923 dos y 322 566 sólo una).
+
+```{r}
+
+# =========================
+# CATÁLOGO ESTADOS
+# =========================
+catalogo_estados <- data.frame(
+  CVE_ENT = sprintf("%02d", 1:32),
+  Estado = c(
+    "Aguascalientes","Baja California","Baja California Sur","Campeche",
+    "Coahuila","Colima","Chiapas","Chihuahua","Ciudad de México",
+    "Durango","Guanajuato","Guerrero","Hidalgo","Jalisco",
+    "Estado de México","Michoacán","Morelos","Nayarit",
+    "Nuevo León","Oaxaca","Puebla","Querétaro","Quintana Roo",
+    "San Luis Potosí","Sinaloa","Sonora","Tabasco","Tamaulipas",
+    "Tlaxcala","Veracruz","Yucatán","Zacatecas"
+  )
+)
+
+# =========================
+# FUNCIÓN GENERAL
+# Función general para identificar extremos (Mínimo/Máximo), aislar Querétaro 
+# y calcular el agregado total de la muestra nacional.
+# =========================
+procesar <- function(base, categoria_txt, indicador_txt, pregunta_txt) {
+  # Identificación de los estados con mayor/menor presencia del indicador
+  estados <- base %>%
+    mutate(categoria = categoria_txt) %>%
+    left_join(catalogo_estados, by = "CVE_ENT") %>%
+    mutate(
+      tipo = case_when(
+        total == max(total) ~ "Mayor",
+        total == min(total) ~ "Menor",
+        Estado == "Querétaro" ~ "Querétaro"
+      ),
+      indicador = indicador_txt,
+      pregunta = pregunta_txt
+    ) %>%
+    filter(!is.na(tipo)) %>%
+    distinct(tipo, .keep_all = TRUE)
+  # Cálculo de la sumatoria nacional para el marco de referencia
+  total <- base %>%
+    summarise(total = sum(total)) %>%
+    mutate(
+      CVE_ENT = "00",
+      Estado = "Total nacional",
+      categoria = categoria_txt,
+      tipo = "Total nacional",
+      indicador = indicador_txt,
+      pregunta = pregunta_txt
+    )
+  
+  bind_rows(estados, total)
+}
+
+# =========================
+# FUNCIÓN POR AÑO
+# =========================
+# Función para extraer y expandir la muestra anual de los archivos de la ENVIPE
+procesar_anio <- function(ruta, anio) {
+  # Lectura del archivo de percepción "TPer_Vic1" de la ENVIPE
+  tper_vic1 <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(tper_vic1) <- toupper(names(tper_vic1))
+  # Casteo de tipos de datos y estandarización del código de entidad
+  tper_vic1 <- tper_vic1 %>%
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      FAC_HOG = as.numeric(FAC_HOG),
+      FAC_ELE = as.numeric(FAC_ELE)
+    )
+  
+  # Corrupción
+  corr_base <- tper_vic1 %>%
+    filter(AP4_2_08 == 1) %>%
+    group_by(CVE_ENT) %>%
+    summarise(
+      total = sum(FAC_ELE, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  corrupcion <- procesar(
+    corr_base,
+    "Sí",
+    "Corrupción",
+    "Corrupción"
+  )
+  
+  corrupcion %>%
+    mutate(anio = anio)
+}
+
+# =========================
+# RUTA BASE
+# =========================
+base_dir <- "E:/envipe/años"
+
+# =========================
+# TABLA GENERAL
+# =========================
+# Iteración sobre los directorios anuales (2021-2025) para unificar la serie de tiempo
+tabla_final_todo <- bind_rows(
+  lapply(2021:2025, function(a)
+    procesar_anio(file.path(base_dir, a), a)
+  )
+)
+
+# =========================
+# GRÁFICA GENERAL
+# =========================
+# Aislamiento de los datos estimados correspondientes al estado de Querétaro
+tabla_plot4 <- tabla_final_todo %>%
+  filter(
+    indicador == "Corrupción",
+    Estado == "Querétaro"
+  ) %>%
+  mutate(
+    total_num = as.numeric(gsub(",", "", total))
+  )
+# Generación del gráfico de barras evolutivo para Corrupción
+ggplot(tabla_plot4,
+       aes(x = factor(anio), y = total_num)) +
+  
+  geom_bar(
+    stat = "identity",
+    fill = "#5BB8B7",
+    width = 0.6
+  ) +
+  
+  geom_text(
+    aes(label = comma(total_num)),
+    vjust = -0.5,
+    size = 3.5
+  ) +
+  
+  scale_y_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.15))
+  ) +
+  
+  labs(
+    title = "Personas de 18 años o mas que identifican a la corrupción como uno de los temas que generan mayor preocupación",
+    x = "Año",
+    y = "Total de personas en el estado de Qro"
+  ) +
+  
+  theme_minimal()
+
+```
+
+El incremento acumulado del 20.8% desde 2021 refleja una tendencia al alza en la exigencia social y una percepción de vulnerabilidad institucional que, lejos de disiparse, se ha intensificado en el último año.
+
+## [Percepción de corrupción por municipio]{style="color:#222222; font-weight:bold;"}
+
+La dimensión territorial permite observar cómo esta percepción se distribuye en el estado y qué municipios concentran mayores niveles de preocupación respecto a la corrupción.
+
+```{r}
+
+# ==============================================================================
+# MAPEO GEOGRÁFICO DE LA CORRUPCIÓN A NIVEL MUNICIPAL
+# ==============================================================================
+catalogo_municipios_qro <- data.frame(
+  CVE_MUN = sprintf("%03d", 1:18),
+  NOM_MUN_REAL = c(
+    "Amealco de Bonfil",
+    "Pinal de Amoles",
+    "Arroyo Seco",
+    "Cadereyta de Montes",
+    "Colon",
+    "Corregidora",
+    "Ezequiel Montes",
+    "Huimilpan",
+    "Jalpan de Serra",
+    "Landa de Matamoros",
+    "El Marques",
+    "Pedro Escobedo",
+    "Penamiller",
+    "Queretaro",
+    "San Joaquin",
+    "San Juan del Rio",
+    "Tequisquiapan",
+    "Toliman"
+  )
+)
+
+# =========================
+# MUNICIPIOS VÁLIDOS ENVIPE
+# =========================
+# Filtro de los únicos municipios con validez representativa urbana en ENVIPE
+municipios_envipe <- c(
+  "Corregidora",
+  "El Marques",
+  "Queretaro"
+)
+
+# =========================
+# FUNCIÓN MUNICIPAL
+# =========================
+# Función para procesar y agrupar la percepción de corrupción por municipio
+procesar_muni_qro <- function(ruta, anio) {
+  
+  df <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(df) <- toupper(names(df))
+  
+  datos <- df %>%
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      CVE_MUN = sprintf("%03d", as.integer(CVE_MUN)),
+      FAC_ELE = as.numeric(FAC_ELE)
+    ) %>%
+    filter(
+      CVE_ENT == "22",
+      AP4_2_08 == 1
+    ) %>%
+    group_by(CVE_MUN) %>%
+    summarise(
+      total = sum(FAC_ELE, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  catalogo_municipios_qro %>%
+    left_join(datos, by = "CVE_MUN") %>%
+     
+    
+    mutate(
+      total = replace_na(total, 0),
+      anio = anio
+    )
+}
+
+# =========================
+# TABLA MUNICIPAL
+# =========================
+# Compilación de la serie de tiempo municipal 2021-2025
+tabla_municipal <- bind_rows(
+  lapply(2021:2025, function(a)
+    procesar_muni_qro(file.path(base_dir, a), a)
+  )
+)
+
+
+
+# =========================
+# FUNCIÓN LIMPIAR TEXTO
+# =========================
+# Función utilitaria para limpiar cadenas de texto (quita acentos, limpia espacios y pasa a MAYÚSCULAS)
+# Crucial para asegurar que el cruce de datos con el archivo .csv del mapa funcione correctamente
+
+limpiar <- function(x) {
+  x %>%
+    stri_trans_general("Latin-ASCII") %>%
+    toupper() %>%
+    trimws()
+}
+
+# =========================
+# CARGAR MAPA
+# =========================
+# Carga de las coordenadas geográficas (polígonos) para construir el mapa de Querétaro
+mapa_qro <- read.csv("qro.csv") %>%
+  mutate(
+    grupo_limpio = limpiar(gsub("_1$", "", grupo))
+  )
+
+tabla_municipal <- tabla_municipal %>%
+  mutate(
+    NOM_MUN_LIMPIO = limpiar(NOM_MUN_REAL)
+  )
+# Cruce final de la información estadística con las coordenadas espaciales
+mapa_datos <- mapa_qro %>%
+  left_join(
+    tabla_municipal,
+    by = c("grupo_limpio" = "NOM_MUN_LIMPIO")
+  ) %>%
+  mutate(
+    total = replace_na(total, 0)
+  )
+
+# =========================
+# CENTROIDES
+# =========================
+# Cálculo de los centroides geométricos para colocar los nombres de los municipios en el mapa
+centros <- mapa_datos %>%
+  group_by(grupo) %>%
+  summarise(
+    Long = mean(Long, na.rm = TRUE),
+    Lat = mean(Lat, na.rm = TRUE),
+    nombre = gsub("_1$", "", first(grupo)),
+    .groups = "drop"
+  )
+
+# ==============================================================================
+# BUCLE DE RENDERIZADO: MAPAS DE CALOR GENERADOS POR AÑO
+# ==============================================================================
+for(a in unique(mapa_datos$anio)) {
+  
+  datos_anio <- mapa_datos %>%
+    filter(anio == a)
+  
+  g <- ggplot(datos_anio) +
+    
+    geom_polygon(
+      aes(
+        Long,
+        Lat,
+        group = id,
+        fill = total
+      ),
+      color = "black",# Contorno de los municipios
+      linewidth = 0.2
+    ) +
+    
+    geom_text(
+      data = centros,
+      aes(Long, Lat, label = nombre),
+      size = 2.2,
+      fontface = "bold",
+      check_overlap = TRUE# Previene la sobreposición de texto en zonas densas
+    ) +
+    
+    scale_fill_gradient(
+      low = "#d6eaf8",# Tonos claros para menor volumen poblacional preocupado
+      high = "#1b4f72",# Tonos oscuros para las zonas metropolitanas de alta preocupación
+      labels = comma
+    ) +
+    
+    coord_fixed() +# Mantiene la proporción geográfica real de la entidad
+    
+    labs(
+      title = paste(
+        "corrupción como uno de los temas que generan mayor preocupación, por municipio -",
+        a
+      ),
+      fill = "Personas"
+    ) +
+    
+    theme_void()# Remueve ejes cartesianos, cuadrículas y fondos
+  
+  print(g)
+}
+
+```
+
+
+El valor más alto registrado en 2022 puede relacionarse con las elecciones estatales de Querétaro de 2021. Durante los periodos electorales, suele incrementarse la atención pública hacia temas como la transparencia, el uso de recursos y la actuación de las autoridades, lo que puede elevar la percepción de corrupción entre la población.
+
+## [2.2 Guardia Nacional]{style="color:#444444; font-weight:bold;"}
+
+La confianza institucional y la percepción sobre la disposición de las autoridades para apoyar a la ciudadanía dictan, en gran medida, la legitimidad de las fuerzas de seguridad. La ENVIPE levanta estos datos precisamente durante los meses de marzo y abril de cada año, permitiendo capturar el sentir de la población de 18 años y más respecto al desempeño de los cuerpos federales.
+
+En esta sección se analiza cuántas personas consideran que la Guardia Nacional tiene una disposición real de ayuda en los distintos municipios del estado de Querétaro.
+
+La confianza institucional y la percepción sobre la disposición de las autoridades para apoyar a la ciudadanía dictan, en gran medida, la legitimidad de las fuerzas de seguridad. La ENVIPE levanta estos datos precisamente durante los meses de marzo y abril de cada año, permitiendo capturar el sentir de la población de 18 años y más respecto al desempeño de los cuerpos federales.
+
+En esta sección se analiza de forma histórica (periodo 2022-2025) cuántas personas consideran que la Guardia Nacional tiene una disposición real de ayuda en los distintos municipios del estado de Querétaro.
+
+```{r, fig.width=12, fig.height=10}
+# ==============================================================================
+# INDICADOR: DISPOSICIÓN DE AYUDA DE LA GUARDIA NACIONAL
+# ==============================================================================
+# 1. FUNCIÓN PARA PROCESAR RESPUESTAS AFIRMATIVAS POR MUNICIPIO
+
+procesar_guardia_municipio <- function(ruta, anio) {
+  
+  df <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(df) <- toupper(names(df))
+  
+  df <- df %>%
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      CVE_MUN = sprintf("%03d", as.integer(CVE_MUN)),
+      FAC_ELE = as.numeric(FAC_ELE)
+    )
+  
+  datos <- df %>%
+    # Filtramos para Querétaro (22) y la variable de disposición de ayuda de la GN
+    # (AP5_4_03 == 1 corresponde a quienes responden que "Sí" está dispuesta a ayudar)
+    filter(
+      CVE_ENT == "22",
+      AP5_4_03 == 1
+    ) %>%
+    group_by(CVE_MUN) %>%
+    summarise(
+      total = sum(FAC_ELE, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  # Cruzamos con tu catálogo de municipios de Qro ya definido arriba
+  catalogo_municipios_qro %>%
+    left_join(datos, by = "CVE_MUN") %>%
+    
+     filter(NOM_MUN_REAL %in% municipios_envipe) %>%
+    mutate(
+      total = replace_na(total, 0),
+      anio = anio
+    )
+}
+
+# =========================
+# 2. CONSTRUCCIÓN DE LA TABLA ACUMULADA HISTÓRICA
+# =========================
+# Aquí recopilamos la información de todos los años disponibles
+tabla_guardia_muni <- bind_rows(
+  lapply(2022:2025, function(a)
+    procesar_guardia_municipio(file.path(base_dir, a), a)
+  )
+)
+
+# =========================
+# 3. GRÁFICA EVOLUTIVA POR AÑO (GGPLOT2)
+# =========================
+ggplot(
+  tabla_guardia_muni,
+  aes(
+    x = reorder(NOM_MUN_REAL, total, FUN = sum), 
+    y = total,
+    fill = total
+  )
+) +
+  geom_col(width = 0.75) +
+  coord_flip() +
+  # creamos una gráfica para cada año automáticamente
+  facet_wrap(~anio, ncol = 3) +
+  
+  geom_text(
+    aes(label = comma(round(total))),
+    hjust = -0.1,
+    size = 2.5,
+    fontface = "bold"
+  ) +
+  # Paleta de degradado institucional
+  scale_fill_gradient(
+    low = "#a2d2ff",
+    high = "#03045e"
+  ) +
+  scale_y_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.35)) # Más espacio a la derecha para que no se corten los números
+  ) +
+  labs(
+    title = "Evolución de la percepción positiva sobre la disposición de la Guardia Nacional para ayudar",
+    subtitle = "Población de 18 años y más por municipio en Querétaro (Histórico 2022-2025)",
+    x = "Municipio",
+    y = "Total de personas que consideran que SÍ ayuda",
+    fill = "Total"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    strip.text = element_text(face = "bold", size = 11, color = "#1F4E79"), # Formato de los títulos de cada año
+    strip.background = element_rect(fill = "#f0f4f8", color = NA),
+    axis.text.y = element_text(size = 8, face = "bold"),
+    axis.text.x = element_text(size = 7),
+    axis.title.x = element_text(face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(face = "bold", margin = margin(r = 10)),
+    plot.title = element_text(face = "bold", size = 14, color = "#03045e"),
+    plot.subtitle = element_text(size = 11, face = "italic", color = "#555555"),
+    panel.grid.minor = element_blank()
+  )
+```
+El comportamiento de la gráfica refleja de manera directa la distribución demográfica del estado de Querétaro, concentrando los mayores volúmenes absolutos de percepción positiva en la Zona Metropolitana (Querétaro, Corregidora y El Marqués) junto con San Juan del Río. Este fenómeno responde principalmente a la densidad de población y al despliegue operativo de las fuerzas de seguridad federales en los centros urbanos y vías principales de comunicación.
+
+Cabe destacar que, al realizar análisis históricos o al contrastar bases de datos de series de tiempo más largas de la ENVIPE, la ausencia de registros o variables asociadas a esta corporación en ciertos años se debe estrictamente a que la Guardia Nacional es una institución de reciente creación (fundada a mediados de 2019), por lo que su incorporación en los cuestionarios de percepción ciudadana del INEGI se dio de manera progresiva a partir de dicha fecha histórica.
+
+## [2.3 Percepcion sobre la seguridad al caminar por las noches]{style="color:#444444; font-weight:bold;"}
+
+La percepción de seguridad en los espacios públicos es un elemento importante para comprender la calidad de vida y el bienestar de la población. Caminar por la noche en los alrededores de la vivienda representa una actividad cotidiana que refleja el nivel de confianza que tienen las personas en su entorno inmediato.
+
+A través de la ENVIPE, es posible identificar cómo percibe la población de 18 años y más las condiciones de seguridad en su municipio, clasificando sus respuestas en categorías que van desde muy segura hasta muy insegura. El análisis de esta información permite observar diferencias territoriales y cambios en la percepción ciudadana a lo largo del tiempo.
+
+```{r}
+# ==============================================================================
+# INDICADOR: SEGURIDAD DE TRÁNSITO NOCTURNO EN ALREDEDORES DE LA VIVIENDA
+# ==============================================================================
+procesar_caminar <- function(ruta, anio) {
+  
+  tper_vic1 <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(tper_vic1) <- toupper(names(tper_vic1))
+  
+  tper_vic1 <- tper_vic1 %>%
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      FAC_ELE = as.numeric(FAC_ELE),
+      AP4_4_A = as.numeric(AP4_4_A)
+    )
+  
+  caminar_base <- tper_vic1 %>%
+    filter(AP4_4_A %in% c(1,2,3,4,5,9)) %>%
+    mutate(
+      categoria = case_when(
+        AP4_4_A == 1 ~ "Muy segura",
+        AP4_4_A == 2 ~ "Segura",
+        AP4_4_A == 3 ~ "Insegura",
+        AP4_4_A == 4 ~ "Muy insegura",
+        AP4_4_A == 5 ~ "No aplica",
+        AP4_4_A == 9 ~ "No sabe"
+      )
+    ) %>%
+    group_by(CVE_ENT, categoria) %>%
+    summarise(
+      total = sum(FAC_ELE, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  caminar <- caminar_base %>%
+    left_join(catalogo_estados, by = "CVE_ENT") %>%
+    mutate(
+      indicador = "Seguridad al caminar",
+      pregunta = "¿Cómo se sienten al caminar por la noche?"
+    )
+  
+  caminar %>%
+    mutate(anio = anio)
+}
+
+# =========================
+# TABLA GENERAL
+# =========================
+
+tabla_caminar <- bind_rows(
+  lapply(2021:2025, function(a) {
+    procesar_caminar(file.path(base_dir, a), a)
+  })
+)
+
+# =========================
+# TABLA PARA GRAFICAR
+# =========================
+
+tabla_plot_caminar <- tabla_caminar %>%
+  filter(
+    Estado == "Querétaro"
+  ) %>%
+  mutate(
+    total_num = as.numeric(total)
+  )
+
+# =========================
+# GRÁFICA
+# =========================
+
+ggplot(
+  tabla_plot_caminar,
+  aes(
+    y = categoria,
+    x = total_num,
+    fill = factor(anio)
+  )
+) +
+  
+  geom_bar(
+    stat = "identity",
+    position = position_dodge(width = 0.8),
+    width = 0.7
+  ) +
+  
+  geom_text(
+    aes(label = comma(round(total_num))),
+    position = position_dodge(width = 0.8),
+    hjust = -0.1,
+    size = 2.8
+  ) +
+  
+  scale_x_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.12))
+  ) +
+  
+  labs(
+    title = "Percepción de seguridad al caminar por la noche en Querétaro",
+    subtitle = "Distribución por categorías y año",
+    x = "Total de personas",
+    y = "Categoría",
+    fill = "Año"
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    plot.title = element_text(
+      face = "bold",
+      size = 14,
+      hjust = 0.5
+    ),
+    
+    plot.subtitle = element_text(
+      size = 11,
+      hjust = 0.5,
+      color = "gray40"
+    ),
+    
+    axis.text.y = element_text(
+      size = 10,
+      face = "bold"
+    ),
+    
+    axis.text.x = element_text(size = 9),
+    
+    legend.position = "top",
+    
+    panel.grid.minor = element_blank(),
+    
+    plot.margin = margin(15, 30, 15, 15)
+  )
+```
+
+En términos generales, las categorías asociadas con percepción negativa de seguridad (insegura y muy insegura) concentran una proporción importante de la población en todos los años observados. Esto indica que una parte significativa de la ciudadanía percibe riesgos al transitar por espacios públicos durante la noche, lo cual refleja condiciones de vulnerabilidad y desconfianza en el entorno inmediato.
+
+Asimismo, la categoría segura también presenta niveles elevados, lo que evidencia que la percepción ciudadana no es homogénea y que coexisten experiencias diferenciadas respecto a la seguridad pública. Esta variabilidad puede relacionarse con factores territoriales, nivel de urbanización, iluminación pública, presencia policial y experiencias personales o comunitarias de victimización.
+
+La categoría muy segura registra valores considerablemente menores en comparación con las percepciones intermedias y negativas, lo que sugiere que son relativamente pocas las personas que manifiestan una percepción plenamente favorable respecto a la seguridad nocturna en su entorno.
+
+Por otro lado, las categorías no sabe y no aplica presentan participaciones reducidas, lo que indica que la mayoría de la población sí cuenta con una percepción definida sobre las condiciones de seguridad en su colonia o comunidad.
+
+## [Análisis a nivel municipal]{style="color:#222222; font-weight:bold;"}
+
+Observemos en las siguientes imagenes lo que la poblacion de cada municipio del estado de Quéretaro opina sobre este tema.
+
+```{r}
+# ==============================================================================
+# DESAGREGACIÓN MUNICIPAL Y CONTROL DE DUPLICADOS EN MARCO MUESTRAL
+# ==============================================================================
+procesar_caminar_muni <- function(ruta, anio) {
+  
+  tper_vic1 <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(tper_vic1) <- toupper(names(tper_vic1))
+  
+  # Identificador único por persona para evitar duplicados por delitos
+  if (!"ID_PER" %in% names(tper_vic1)) {
+    tper_vic1 <- tper_vic1 %>% mutate(ID_PER = paste(VIV_SEL, HOGAR, R_SEL, sep = "_"))
+  }
+  
+  df_limpio <- tper_vic1 %>%
+    filter(
+      sprintf("%02d", as.integer(CVE_ENT)) == "22",
+      AP4_4_A %in% c(1, 2, 3, 4, 5, 9)
+    ) %>%
+    mutate(
+      CVE_MUN = sprintf("%03d", as.integer(CVE_MUN)),
+      FAC_ELE = as.numeric(FAC_ELE),
+      categoria = case_when(
+        AP4_4_A == 1 ~ "Muy segura",
+        AP4_4_A == 2 ~ "Segura",
+        AP4_4_A == 3 ~ "Insegura",
+        AP4_4_A == 4 ~ "Muy insegura",
+        AP4_4_A == 5 ~ "No aplica",
+        AP4_4_A == 9 ~ "No sabe"
+      )
+    ) %>%
+    # Agrupamos por persona para asegurar que el factor de expansión no se duplique
+    group_by(ID_PER) %>%
+    summarise(
+      CVE_MUN = first(CVE_MUN),
+      categoria = first(categoria),
+      FAC_ELE = first(FAC_ELE),
+      .groups = "drop"
+    )
+  
+  # Agrupamos por municipio y categoría
+  datos_muni <- df_limpio %>%
+    group_by(CVE_MUN, categoria) %>%
+    summarise(
+      total = sum(FAC_ELE, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  # para tener los nombres reales de los municipios
+  catalogo_municipios_qro %>%
+    left_join(datos_muni, by = "CVE_MUN") %>%
+    filter(NOM_MUN_REAL %in% municipios_envipe) %>%
+    mutate(
+      total = replace_na(total, 0),
+      anio = anio
+    ) %>%
+    select(Municipio = NOM_MUN_REAL, categoria, total, anio)
+}
+
+# Inicialización y construcción de la base de datos de tránsito nocturno por municipios
+tabla_caminar_municipio <- bind_rows(
+  lapply(2021:2025, function(a) {
+    procesar_caminar_muni(file.path(base_dir, a), a)
+  })
+)
+
+# ==========================================================
+# PALETA DE 5 COLORES(creada con ayuda de  chatgpt)
+# ==========================================================
+paleta_seguridad <- c(
+  "#147BBE", # Azul bebé
+  "#148F92", # Turquesa
+  "#317C96", # Azul mar
+  "#8DC63F", # Verde limón
+  "#32763A"  # Verde iguana
+)
+
+# ==========================================================
+# FUNCIÓN PARA GRAFICAR
+# ==========================================================
+graficar_categoria_caminar <- function(cat){
+  
+  datos <- tabla_caminar_municipio %>%
+    filter(categoria == cat)
+  
+  ggplot(
+    datos,
+    aes(
+      y = reorder(Municipio, total, FUN = sum),
+      x = total,
+      fill = factor(anio)
+    )
+  ) +
+    
+    geom_bar(
+      stat = "identity",
+      width = 0.7
+    ) +
+    
+    geom_text(
+      aes(label = comma(round(total))),
+      hjust = -0.1,
+      size = 2.3,
+      fontface = "bold"
+    ) +
+    
+    scale_fill_manual(values = paleta_seguridad) +
+    
+    scale_x_continuous(
+      labels = comma,
+      expand = expansion(mult = c(0, 0.18))
+    ) +
+    
+    facet_wrap(# Renderiza paneles bianuales organizados en dos columnas
+      ~ anio,
+      ncol = 2
+    ) +
+    
+    labs(
+      title = paste0("Población de 18 años y más que se siente ", tolower(cat)),
+      subtitle = "Al caminar por la noche en los alrededores de su vivienda por municipio (Histórico)",
+      x = "Total de personas",
+      y = "Municipio"
+    ) +
+    
+    theme_minimal() +
+    
+    theme(
+      plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+      plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray40"),
+      strip.text = element_text(face = "bold", size = 10, color = "white"),
+      strip.background = element_rect(fill = "#317C96", color = NA),
+      axis.text.y = element_text(size = 8, face = "bold"),
+      axis.text.x = element_text(size = 8),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.y = element_blank(),# Remueve rejillas horizontales para limpiar el fondo
+      legend.position = "none",
+      plot.margin = margin(15, 20, 15, 15)
+    )
+}
+# ==============================================================================
+# INVOCACIÓN SEQUENCIAL DE GRÁFICOS DE PERCEPCIÓN NOCTURNA MUNICIPAL
+# ==============================================================================
+
+# Muy segura
+graficar_categoria_caminar("Muy segura")
+
+# Segura
+graficar_categoria_caminar("Segura")
+
+# Insegura
+graficar_categoria_caminar("Insegura")
+
+# Muy insegura
+graficar_categoria_caminar("Muy insegura")
+```
+En general, se observa que la mayoría de la población se concentra en las categorías de segura e insegura, lo que indica que existen opiniones divididas sobre qué tan tranquilo es caminar por la noche cerca de sus viviendas.
+
+En algunos municipios hay más personas que se sienten seguras o muy seguras, lo que puede relacionarse con mejores condiciones de iluminación, vigilancia o convivencia comunitaria. En cambio, otros municipios presentan niveles más altos de población que se siente insegura o muy insegura, reflejando una mayor preocupación por la delincuencia o por las condiciones del entorno urbano.
+
+También se pueden notar diferencias importantes entre municipios grandes y pequeños. Los municipios con mayor población suelen registrar cantidades más altas en casi todas las categorías, especialmente en las percepciones de inseguridad. Esto puede deberse a una mayor actividad urbana, tráfico, movilidad y exposición a situaciones de riesgo.
+
+Al comparar los años, las gráficas permiten identificar si la percepción de seguridad mejora o empeora con el tiempo. En algunos casos la sensación de inseguridad aumenta, mientras que en otros parece mantenerse más estable. Esto ayuda a entender cómo percibe la población los cambios en su entorno cotidiano.
+
+## [2.4 Percepción futura sobre la seguridad pública en su colonia]{style="color:#444444; font-weight:bold;"}
+
+La percepción ciudadana sobre el futuro de la seguridad pública permite conocer las expectativas que tiene la población respecto a las condiciones de seguridad en su colonia o comunidad. Este indicador resulta relevante porque refleja no sólo la situación actual que perciben las personas, sino también el nivel de confianza o preocupación que tienen sobre los cambios que podrían ocurrir en los próximos meses.
+
+```{r}
+# ==============================================================================
+# INDICADOR: PERSPECTIVA Y PROYECCIÓN FUTURA DE LA SEGURIDAD
+# ==============================================================================
+# Función para aislar y clasificar la variable AP4_7_1
+procesar_percepcion <- function(ruta, anio) {
+  
+  tper_vic1 <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(tper_vic1) <- toupper(names(tper_vic1))
+  
+  tper_vic1 <- tper_vic1 %>%
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      FAC_ELE = as.numeric(FAC_ELE),
+      AP4_7_1 = as.numeric(AP4_7_1)
+    )
+  # Reestructuración semántica de la escala de expectativas del ciudadano
+  percepcion_base <- tper_vic1 %>%
+    filter(AP4_7_1 %in% c(1,2,3,4,9)) %>%
+    mutate(
+      categoria = case_when(
+        AP4_7_1 == 1 ~ "Mejorará",
+        AP4_7_1 == 2 ~ "Seguirá igual de bien",
+        AP4_7_1 == 3 ~ "Seguirá igual de mal",
+        AP4_7_1 == 4 ~ "Empeorará",
+        AP4_7_1 == 9 ~ "No sabe"
+      )
+    ) %>%
+    group_by(CVE_ENT, categoria) %>%
+    summarise(
+      total = sum(FAC_ELE, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  percepcion <- percepcion_base %>%
+    left_join(catalogo_estados, by = "CVE_ENT") %>%
+    mutate(
+      indicador = "Percepción futura",
+      pregunta = "¿Cómo considera que cambiará la seguridad en su colonia?"
+    )
+  
+  percepcion %>%
+    mutate(anio = anio)
+}
+
+# =========================
+# TABLA GENERAL
+# =========================
+# Unificación histórica de las expectativas de seguridad pública (2021-2025)
+tabla_percepcion <- bind_rows(
+  lapply(2021:2025, function(a) {
+    procesar_percepcion(file.path(base_dir, a), a)
+  })
+)
+
+# =========================
+# TABLA PARA GRAFICAR
+# =========================
+
+tabla_plot_percepcion <- tabla_percepcion %>%
+  filter(
+    Estado == "Querétaro"
+  ) %>%
+  mutate(
+    total_num = as.numeric(total)
+  )
+
+# =========================
+# GRÁFICA HORIZONTAL
+# =========================
+# Construcción de la visualización horizontal comparativa
+ggplot(
+  tabla_plot_percepcion,
+  aes(
+    y = categoria,
+    x = total_num,
+    fill = factor(anio)
+  )
+) +
+  
+  geom_bar(
+    stat = "identity",
+    position = position_dodge(width = 0.8),
+    width = 0.7
+  ) +
+  
+  geom_text(
+    aes(label = comma(round(total_num))),
+    position = position_dodge(width = 0.8),
+    hjust = -0.1,
+    size = 2.8
+  ) +
+  
+  scale_x_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.12))
+  ) +
+  
+  labs(
+    title = "Población de 18 años y más, del estado de Querétaro, \nsegún su percepcion futura sobre la seguridad pública en su colonia ",
+    x = "Total de personas",
+    y = "Categoría",
+    fill = "Año"
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    plot.title = element_text(
+      face = "bold",
+      size = 14,
+      hjust = 0.5
+    ),
+    
+    plot.subtitle = element_text(
+      size = 11,
+      hjust = 0.5,
+      color = "gray40"
+    ),
+    
+    axis.text.y = element_text(
+      size = 10,
+      face = "bold"
+    ),
+    
+    axis.text.x = element_text(size = 9),
+    
+    legend.position = "top",
+    
+    panel.grid.minor = element_blank(),
+    
+    plot.margin = margin(15, 30, 15, 15)
+  )
+```
+En general, puede observarse que muchas personas consideran que la situación permanecerá igual, ya sea “igual de bien” o “igual de mal”, lo que refleja cierta percepción de estabilidad en las condiciones de seguridad.
+
+Sin embargo, también existe una cantidad importante de personas que consideran que la seguridad podría empeorar. Esto indica que parte de la población mantiene preocupación o incertidumbre sobre la situación de seguridad en los próximos meses. Factores como la delincuencia, las experiencias personales, las noticias o la percepción de vigilancia pueden influir en esta opinión.
+
+Por otro lado, el grupo de personas que cree que la seguridad mejorará suele ser menor en comparación con quienes consideran que seguirá igual o empeorará. Esto puede interpretarse como una percepción moderada sobre la capacidad de mejorar las condiciones de seguridad en el corto plazo.
+
+En términos generales, la gráfica refleja que la percepción ciudadana sobre la seguridad pública está dividida y que muchas personas aún muestran preocupación respecto al futuro de su entorno. 
+
+## [Análisis a nivel municipal]{style="color:#222222; font-weight:bold;"}
+
+```{r}
+# =========================
+# PERCEPCIÓN FUTURA
+# COMPARACIÓN MUNICIPAL
+# =========================
+
+procesar_percepcion_municipio <- function(ruta, anio) {
+  
+  tper_vic1 <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(tper_vic1) <- toupper(names(tper_vic1))
+  
+  if("MUN" %in% names(tper_vic1) && !"CVE_MUN" %in% names(tper_vic1)){
+    tper_vic1$CVE_MUN <- tper_vic1$MUN
+  }
+  
+  tper_vic1 <- tper_vic1 %>%
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      CVE_MUN = sprintf("%03d", as.integer(CVE_MUN)),
+      FAC_ELE = as.numeric(FAC_ELE),
+      AP4_7_1 = as.numeric(AP4_7_1)
+    ) %>%
+    filter(CVE_ENT == "22")
+  
+  percepcion_base <- tper_vic1 %>%
+    filter(AP4_7_1 %in% c(1,2,3,4)) %>%
+    mutate(
+      categoria = case_when(
+        AP4_7_1 == 1 ~ "Mejorará",
+        AP4_7_1 == 2 ~ "Seguirá igual de bien",
+        AP4_7_1 == 3 ~ "Seguirá igual de mal",
+        AP4_7_1 == 4 ~ "Empeorará"
+      )
+    ) %>%
+    group_by(CVE_MUN, categoria) %>%
+    summarise(
+      total = sum(FAC_ELE, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    left_join(catalogo_municipios_qro, by = "CVE_MUN") %>%
+    
+    filter(NOM_MUN_REAL %in% municipios_envipe)
+    
+  percepcion_base %>%
+    mutate(anio = anio)
+}
+
+# =========================
+# TABLA GENERAL
+# =========================
+
+tabla_percepcion_municipio <- bind_rows(
+  lapply(2021:2024, function(a) {
+    procesar_percepcion_municipio(file.path(base_dir, a), a)
+  })
+)
+
+# =========================
+# FUNCIÓN GENERADORA
+# =========================
+# ==========================================================
+# PALETA DE 5 COLORES
+# ==========================================================
+paleta_seguridad <- c(
+  "#147BBE", # Azul bebé
+  "#148F92", # Turquesa
+  "#317C96", # Azul mar
+  "#8DC63F", # Verde limón
+  "#32763A"  # Verde iguana
+)
+
+# ==========================================================
+# FUNCIÓN PARA GRAFICAR
+# ==========================================================
+graficar_categoria_percepcion <- function(cat){
+  
+  datos <- tabla_percepcion_municipio %>%
+    filter(categoria == cat)
+  
+  ggplot(
+    datos,
+    aes(
+      y = reorder(NOM_MUN_REAL, total),
+      x = total,
+      fill = factor(anio)
+    )
+  ) +
+    
+    geom_bar(
+      stat = "identity",
+      width = 0.7
+    ) +
+    
+    geom_text(
+      aes(label = comma(round(total))),
+      hjust = -0.1,
+      size = 2.5,
+      fontface = "bold"
+    ) +
+    
+    scale_fill_manual(values = paleta_seguridad) +
+    
+    scale_x_continuous(
+      labels = comma,
+      expand = expansion(mult = c(0,0.15))
+    ) +
+    
+    facet_wrap(
+      ~ anio,
+      ncol = 2
+    ) +
+    
+    labs(
+      title = paste0(
+        "Población de 18 años y más, por cada municipio del estado de Querétaro, \nque considera que la seguridad pública en su colonia ",
+        tolower(cat)
+      ),
+      subtitle = "Comparación municipal por año",
+      x = "Total de personas",
+      y = "Municipio"
+    ) +
+    
+    theme_minimal() +
+    
+    theme(
+      plot.title = element_text(
+        face = "bold",
+        size = 11,
+        hjust = 0.5
+      ),
+      
+      plot.subtitle = element_text(
+        size = 10,
+        hjust = 0.5,
+        color = "gray40"
+      ),
+      
+      strip.text = element_text(
+        face = "bold",
+        size = 11,
+        color = "white"
+      ),
+      
+      strip.background = element_rect(
+        fill = "#317C96"
+      ),
+      
+      axis.text.y = element_text(
+        size = 7,
+        face = "bold"
+      ),
+      
+      axis.text.x = element_text(size = 8),
+      
+      panel.grid.minor = element_blank(),
+      
+      panel.grid.major.y = element_blank(),
+      
+      legend.position = "none",
+      
+      plot.margin = margin(15,30,15,15)
+    )
+}
+
+# =========================
+# GRÁFICAS INDIVIDUALES
+# =========================
+
+# Mejorará
+graficar_categoria_percepcion("Mejorará")
+
+# Seguirá igual de bien
+graficar_categoria_percepcion("Seguirá igual de bien")
+
+# Seguirá igual de mal
+graficar_categoria_percepcion("Seguirá igual de mal")
+
+# Empeorará
+graficar_categoria_percepcion("Empeorará")
+
+```
+En los municipios con mayor población, normalmente se observan cantidades más altas en todas las categorías. Esto no necesariamente significa que sean los más inseguros, sino que concentran un mayor número de habitantes y, por lo tanto, más respuestas dentro de la encuesta.
+
+En varios municipios destaca la categoría “seguirá igual de mal” o “empeorará”, lo cual refleja preocupación de la población sobre las condiciones de seguridad en su entorno. Esto puede relacionarse con problemas cotidianos como robos, falta de iluminación, percepción de poca vigilancia o desconfianza en las instituciones.
+
+Por otro lado, algunos municipios muestran una percepción más positiva, donde más personas consideran que la seguridad podría mejorar o mantenerse bien. Esto puede asociarse con un mayor sentido de tranquilidad comunitaria o con una percepción favorable de las acciones de seguridad pública.
+
+Al comparar los años, las gráficas también permiten identificar cambios en la percepción ciudadana. En algunos municipios la preocupación parece aumentar, mientras que en otros se mantiene más estable. Esto ayuda a entender cómo evoluciona la percepción de seguridad en distintas regiones del estado.
+
+En conjunto, las gráficas muestran que la percepción sobre el futuro de la seguridad pública varía considerablemente entre municipios y que la experiencia cotidiana de la población influye directamente en cómo evalúan la seguridad de su comunidad.
+
+## [2.5 Confianza vecinal]{style="color:#444444; font-weight:bold;"}
+
+Algunos de los determinantes que incrementan o disminuyen la confianza en los vecinos, además de las incivilidades, son la falta de cooperación entre los habitantes, la baja confianza en las autoridades locales, el estatus de haber sido víctima directa y/o indirecta de conductas delictivas y algunas características sociodemográficas como la edad o el género(en los datos se excluye la opcion "no sabe/no responde").
+
+```{r}
+
+# =========================
+# CONFIANZA EN VECINOS
+# =========================
+
+procesar_confianza <- function(ruta, anio) {
+  
+  tper_vic1 <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(tper_vic1) <- toupper(names(tper_vic1))
+  
+  tper_vic1 <- tper_vic1 %>%
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      FAC_ELE = as.numeric(FAC_ELE)
+    )
+  
+  # =========================
+  # BASE CONFIANZA
+  # =========================
+  confianza_base <- tper_vic1 %>%
+    filter(AP5_2_1 %in% c(1,2,3,4,5,9)) %>%
+    
+    mutate(
+      categoria = case_when(
+        AP5_2_1 == 1 ~ "Mucha",
+        AP5_2_1 == 2 ~ "Alguna",
+        AP5_2_1 == 3 ~ "Poca",
+        AP5_2_1 == 4 ~ "Nada",
+        AP5_2_1 == 5 ~ "No aplica",
+        AP5_2_1 == 9 ~ "No sabe"
+      )
+    ) %>%
+    
+    group_by(CVE_ENT, categoria) %>%
+    
+    summarise(
+      total = sum(FAC_ELE, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  confianza <- bind_rows(
+    
+    confianza_base %>%
+      left_join(catalogo_estados, by = "CVE_ENT") %>%
+      
+      group_by(categoria) %>%
+      
+      mutate(
+        tipo = case_when(
+          total == max(total) ~ "Mayor",
+          total == min(total) ~ "Menor",
+          Estado == "Querétaro" ~ "Querétaro"
+        ),
+        
+        indicador = "Confianza vecinos",
+        
+        pregunta = "¿Qué nivel de confianza tiene en sus vecinos?"
+      ) %>%
+      
+      filter(!is.na(tipo)) %>%
+      
+      distinct(categoria, tipo, .keep_all = TRUE),
+    
+    
+    confianza_base %>%
+      group_by(categoria) %>%
+      
+      summarise(
+        total = sum(total),
+        .groups = "drop"
+      ) %>%
+      
+      mutate(
+        CVE_ENT = "00",
+        Estado = "Total nacional",
+        tipo = "Total nacional",
+        indicador = "Confianza vecinos",
+        pregunta = "¿Qué nivel de confianza tiene en sus vecinos?"
+      )
+  )
+  
+  confianza %>%
+    mutate(anio = anio)
+}
+
+# =========================
+# TABLA GENERAL
+# =========================
+tabla_confianza <- bind_rows(
+  lapply(2021:2025, function(a)
+    procesar_confianza(file.path(base_dir, a), a)
+  )
+)
+
+# =========================
+# GRÁFICA
+# =========================
+
+# =========================
+# TABLA PARA PORCENTAJES
+# =========================
+tabla_plot_vecinos <- tabla_confianza %>%
+  
+  filter(
+    indicador == "Confianza vecinos",
+    Estado == "Total nacional"
+  ) %>%
+  
+  group_by(anio) %>%
+  
+  mutate(
+    porcentaje = total / sum(total) * 100
+  ) %>%
+  
+  ungroup()
+
+# =========================
+# GRÁFICA EN PORCENTAJES
+# =========================
+ggplot(
+  tabla_plot_vecinos,
+  
+  aes(
+    x = factor(anio),
+    y = porcentaje,
+    fill = categoria
+  )
+) +
+  
+  geom_bar(
+    stat = "identity",
+    position = "dodge"
+  ) +
+  
+  geom_text(
+    aes(label = paste0(round(porcentaje,1), "%")),
+    
+    position = position_dodge(width = 0.9),
+    
+    vjust = -0.3,
+    
+    size = 2
+  ) +
+  
+  scale_y_continuous(
+    labels = percent_format(scale = 1)
+  ) +
+  
+  labs(
+    title = "Personas que reportan tener mucha confianza en sus vecinos",
+    
+    x = "Año",
+    
+    y = "Porcentaje",
+    
+    fill = "Categoría"
+  ) +
+  
+  theme_minimal()
+
+```
+La percepción de confianza vecinal en Querétaro se mantiene más fuerte en los municipios con mayor dinamismo urbano y densidad poblacional, aunque las diferencias observadas parecen responder más al volumen de habitantes que a una ausencia de relaciones comunitarias en los municipios pequeños.
+
+```{r}
+
+# =========================
+# MUCHA CONFIANZA POR MUNICIPIO
+# =========================
+
+procesar_confianza_municipio <- function(ruta, anio) {
+  
+  df <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(df) <- toupper(names(df))
+  
+  df %>%
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      CVE_MUN = sprintf("%03d", as.integer(CVE_MUN)),
+      FAC_ELE = as.numeric(FAC_ELE)
+    ) %>%
+    
+    filter(
+      CVE_ENT == "22",
+      AP5_2_1 == 1   # Mucha confianza
+    ) %>%
+    
+    group_by(CVE_MUN) %>%
+    
+    summarise(
+      total = sum(FAC_ELE, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    
+    left_join(
+      catalogo_municipios_qro,
+      by = "CVE_MUN"
+    ) %>%
+    filter(NOM_MUN_REAL %in% municipios_envipe) %>%
+    mutate(
+      total = replace_na(total, 0),
+      anio = anio
+    )
+}
+
+# =========================
+# TABLA MUNICIPAL
+# =========================
+
+tabla_confianza_muni <- bind_rows(
+  lapply(2021:2025, function(a)
+    procesar_confianza_municipio(
+      file.path(base_dir, a),
+      a
+    )
+  )
+)
+
+# =========================
+# FILTRAR AÑO
+# =========================
+
+datos_grafica <- tabla_confianza_muni %>%
+  
+  filter(anio == 2025) %>%
+  
+  arrange(total)
+
+# =========================
+# GRÁFICA
+# =========================
+
+ggplot(
+  datos_grafica,
+  
+  aes(
+    x = reorder(NOM_MUN_REAL, total),
+    y = total,
+    fill = total
+  )
+) +
+  
+  geom_bar(
+    stat = "identity"
+  ) +
+  
+  coord_flip() +
+  
+  geom_text(
+    aes(
+      label = comma(round(total))
+    ),
+    
+    hjust = -0.1,
+    
+    size = 3
+  ) +
+  
+  scale_fill_gradient(
+    low = "#a8dadc",
+    high = "#1d3557"
+  ) +
+  
+  scale_y_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.12))
+  ) +
+  
+  labs(
+    title = "Personas con mucha confianza en sus vecinos por municipio (2025)",
+    
+    x = "Municipio",
+    
+    y = "Total de personas"
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    legend.position = "none",
+    
+    axis.text.y = element_text(
+      size = 9,
+      face = "bold"
+    ),
+    
+    plot.title = element_text(
+      face = "bold",
+      size = 14
+    )
+  )
+
+```
+
+## [3.Impacto de la delincuencia en actividades cotidianas]{style="color:#1F4E79; font-weight:bold;"}
+
+## [3.1 Trabajo inseguro]{style="color:#444444; font-weight:bold;"}
+
+El entorno laboral no solo representa el motor económico de las familias en Querétaro, sino también uno de los espacios donde la población adulta pasa la mayor parte de su día. La ENVIPE capta el sentir de la población económicamente activa durante los meses de marzo y abril, permitiendo evaluar si las dinámicas de seguridad externa han logrado permear negativamente en los centros de trabajo.
+
+A continuación, se presenta la evolución histórica (2021-2025) del volumen de personas de 18 años y más que cuentan con un trabajo y consideran que su espacio laboral es inseguro, desglosado por municipio.
+
+```{r, fig.width=10, fig.height=8}
+# =========================
+# 1. FUNCIÓN TRABAJO INSEGURO MUNICIPAL
+# =========================
+procesar_trabajo_inseguro_muni <- function(ruta, anio) {
+  
+  df <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(df) <- toupper(names(df))
+  
+  df <- df %>%
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      CVE_MUN = sprintf("%03d", as.integer(CVE_MUN)),
+      FAC_ELE = as.numeric(FAC_ELE)
+    )
+  
+  datos <- df %>%
+    # CORRECCIÓN SARTORIAL: 
+    # AP4_4_02 "Trabajo" y 2 "Inseguro"
+    filter(
+      CVE_ENT == "22",
+      AP4_4_02 == 2
+    ) %>%
+    group_by(CVE_MUN) %>%
+    summarise(
+      total = sum(FAC_ELE, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  catalogo_municipios_qro %>%
+    left_join(datos, by = "CVE_MUN") %>%
+    filter(NOM_MUN_REAL %in% municipios_envipe) %>%
+    mutate(
+      total = replace_na(total, 0),
+      anio = anio
+    )
+}
+
+# =========================
+# 2. CONSTRUCCIÓN DE LA TABLA ACUMULADA HISTÓRICA
+# =========================
+tabla_trabajo_inseguro <- bind_rows(
+  lapply(2021:2025, function(a)
+    procesar_trabajo_inseguro_muni(file.path(base_dir, a), a)
+  )
+)
+
+# =========================
+# 3. GRÁFICA: MAPA DE CALOR (HEATMAP)
+# =========================
+ggplot(
+  tabla_trabajo_inseguro,
+  aes(
+    x = factor(anio), # Años en el eje X
+    y = reorder(NOM_MUN_REAL, total, FUN = sum), # Municipios ordenados en el eje Y
+    fill = total
+  )
+) +
+  # Creamos los mosaicos con una línea blanca delgada de separación
+  geom_tile(color = "white", linewidth = 0.3) +
+  
+  # Agregamos los números dentro de cada celda para mantener la precisión
+  geom_text(
+    aes(label = comma(round(total))),
+    size = 2.8,
+    fontface = "bold",
+    color = "black"
+  ) +
+  
+  # Paleta de degradado de riesgo 
+  scale_fill_gradient(
+    low = "#E8F5E9",
+    high = "#32763A",
+    labels = comma
+  ) +
+  
+  labs(
+    title = "Matriz de riesgo: Percepción de inseguridad en el trabajo",
+    subtitle = "Evolución de la población ocupada que se siente insegura por municipio (2021-2025)",
+    x = "Año de la encuesta",
+    y = "Municipio",
+    fill = "Personas afectadas"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 9, face = "bold"),
+    axis.text.x = element_text(size = 10, face = "bold"),
+    axis.title.x = element_text(face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(face = "bold", margin = margin(r = 10)),
+    plot.title = element_text(face = "bold", size = 14, color = "#0059B3"),
+    plot.subtitle = element_text(size = 11, face = "italic", color = "#555555"),
+    panel.grid = element_blank(), # Quitamos las líneas de fondo para un look limpio
+    legend.position = "right"
+  )
+```
+Los municipios más grandes, con más fábricas y comercios —como Querétaro, San Juan del Río y El Marqués—  tienen colores más oscuros ya que en dichos municipios es donde trabaja la gran mayoría de la gente del estado y, por lo tanto, es donde se acumula el mayor número de personas que sienten miedo o desconfianza en sus centros de trabajo.
+
+## [3.2 Abandono escolar por temor a ser víctimas de la delincuencia]{style="color:#444444; font-weight:bold;"}
+
+La inseguridad puede afectar distintas actividades de la vida cotidiana, incluyendo la asistencia a espacios educativos. El temor a ser víctima de un delito puede provocar cambios en los hábitos de la población, limitando la movilidad y reduciendo la participación en actividades académicas o de formación.
+
+A través de la ENVIPE, es posible identificar a la población de 18 años y más que manifestó haber dejado de asistir a la escuela debido al miedo relacionado con la delincuencia. El análisis de esta información permite observar cómo la percepción de inseguridad impacta en el acceso y permanencia en los espacios educativos, así como identificar diferencias entre municipios del estado de Querétaro y cambios a lo largo del tiempo.
+
+```{r}
+# =========================
+# DEJÓ DE IR A LA ESCUELA
+# =========================
+
+procesar_escuela <- function(ruta, anio) {
+  
+  tper_vic1 <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(tper_vic1) <- toupper(names(tper_vic1))
+  
+  tper_vic1 <- tper_vic1 %>%
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      FAC_ELE = as.numeric(FAC_ELE),
+      AP4_10_07 = as.numeric(AP4_10_07)
+    )
+  
+  escuela_base <- tper_vic1 %>%
+    filter(AP4_10_07 %in% c(1,2,9)) %>%
+    mutate(
+      categoria = case_when(
+        AP4_10_07 == 1 ~ "Sí dejó de asistir",
+        AP4_10_07 == 2 ~ "No dejó de asistir",
+        AP4_10_07 == 9 ~ "No sabe"
+      )
+    ) %>%
+    group_by(CVE_ENT, categoria) %>%
+    summarise(
+      total = sum(FAC_ELE, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  escuela <- escuela_base %>%
+    left_join(catalogo_estados, by = "CVE_ENT") %>%
+    mutate(
+      indicador = "Deserción escolar",
+      pregunta = "¿Dejó de ir a la escuela por temor a ser víctima de la delincuencia?"
+    )
+  
+  escuela %>%
+    mutate(anio = anio)
+}
+
+# =========================
+# TABLA GENERAL
+# =========================
+
+tabla_escuela <- bind_rows(
+  lapply(2021:2025, function(a) {
+    procesar_escuela(file.path(base_dir, a), a)
+  })
+)
+
+# =========================
+# TABLA PARA GRAFICAR
+# =========================
+
+tabla_plot_escuela <- tabla_escuela %>%
+  filter(
+    Estado == "Querétaro"
+  ) %>%
+  mutate(
+    total_num = as.numeric(total)
+  )
+
+# =========================
+# GRÁFICA HORIZONTAL
+# =========================
+
+ggplot(
+  tabla_plot_escuela,
+  aes(
+    y = categoria,
+    x = total_num,
+    fill = factor(anio)
+  )
+) +
+  
+  geom_bar(
+    stat = "identity",
+    position = position_dodge(width = 0.8),
+    width = 0.7
+  ) +
+  
+  geom_text(
+    aes(label = comma(round(total_num))),
+    position = position_dodge(width = 0.8),
+    hjust = -0.1,
+    size = 2.8
+  ) +
+  
+  scale_x_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.12))
+  ) +
+  
+  labs(
+    title = "Población de 18 años y más, del estado de Quéretaro, que\n dejó de asistir a la escuela por temor a ser victimas de la delincuencia",
+    subtitle = "Población de 18 años y más en Querétaro",
+    x = "Total de personas",
+    y = "Categoría",
+    fill = "Año"
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    plot.title = element_text(
+      face = "bold",
+      size = 12,
+      hjust = 0.5
+    ),
+    
+    plot.subtitle = element_text(
+      size = 11,
+      hjust = 0.5,
+      color = "gray40"
+    ),
+    
+    axis.text.y = element_text(
+      size = 10,
+      face = "bold"
+    ),
+    
+    axis.text.x = element_text(size = 9),
+    
+    legend.position = "top",
+    
+    panel.grid.minor = element_blank(),
+    
+    plot.margin = margin(15, 30, 15, 15)
+  )
+```
+Aunque la mayor parte de la población indica que no dejó de asistir, también se observa que existe un grupo de personas cuya vida académica sí se vio afectada por la percepción de inseguridad.
+
+Este resultado refleja que la inseguridad no solo impacta en la tranquilidad de las personas, sino también en actividades importantes como la educación. El miedo a sufrir un delito puede influir en la decisión de dejar de acudir a clases, especialmente cuando los trayectos se consideran peligrosos o cuando existe poca confianza en las condiciones de seguridad del entorno.
+
+A lo largo de los años analizados, la gráfica permite identificar si esta problemática aumenta, disminuye o se mantiene estable. Cuando el número de personas que dejan de asistir a la escuela crece, puede interpretarse como una señal de mayor preocupación social respecto a la delincuencia y sus efectos en la vida cotidiana.
+
+Por otro lado, el hecho de que la mayoría de las personas responda que no dejó de asistir muestra que, aunque la inseguridad afecta a una parte de la población, no impacta de la misma manera a todos los sectores. Sin embargo, incluso cantidades relativamente pequeñas son importantes, ya que representan personas cuya formación educativa se vio limitada por el temor y la percepción de riesgo.
+
+## [Análisis a nivel municipal]{style="color:#222222; font-weight:bold;"}
+
+```{r}
+# =========================
+# DEJÓ DE IR A LA ESCUELA
+# COMPARACIÓN MUNICIPAL
+# =========================
+
+procesar_escuela_municipio <- function(ruta, anio) {
+  
+  tper_vic1 <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(tper_vic1) <- toupper(names(tper_vic1))
+  
+  if("MUN" %in% names(tper_vic1) && !"CVE_MUN" %in% names(tper_vic1)){
+    tper_vic1$CVE_MUN <- tper_vic1$MUN
+  }
+  
+  tper_vic1 <- tper_vic1 %>%
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      CVE_MUN = sprintf("%03d", as.integer(CVE_MUN)),
+      FAC_ELE = as.numeric(FAC_ELE),
+      AP4_10_07 = as.numeric(AP4_10_07)
+    ) %>%
+    filter(CVE_ENT == "22")
+  
+  escuela_base <- tper_vic1 %>%
+    filter(AP4_10_07 %in% c(1,2)) %>%
+    mutate(
+      categoria = case_when(
+        AP4_10_07 == 1 ~ "Sí dejó de asistir",
+        AP4_10_07 == 2 ~ "No dejó de asistir",
+      )
+    ) %>%
+    group_by(CVE_MUN, categoria) %>%
+    summarise(
+      total = sum(FAC_ELE, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    left_join(catalogo_municipios_qro, by = "CVE_MUN")%>%
+    
+    filter(NOM_MUN_REAL %in% municipios_envipe)
+  
+  escuela_base %>%
+    mutate(anio = anio)
+}
+
+# =========================
+# TABLA GENERAL
+# =========================
+
+tabla_escuela_municipio <- bind_rows(
+  lapply(2021:2024, function(a) {
+    procesar_escuela_municipio(file.path(base_dir, a), a)
+  })
+)
+
+# =========================
+# FUNCIÓN GENERADORA
+# =========================
+# ==========================================================
+# PALETA DE 5 COLORES
+# ==========================================================
+paleta_seguridad <- c(
+  "#147BBE", # Azul bebé
+  "#148F92", # Turquesa
+  "#317C96", # Azul mar
+  "#8DC63F", # Verde limón
+  "#32763A"  # Verde iguana
+)
+
+# ==========================================================
+# FUNCIÓN PARA GRAFICAR
+# ==========================================================
+graficar_categoria_escuela <- function(cat){
+  
+  datos <- tabla_escuela_municipio %>%
+    filter(categoria == cat)
+  
+  ggplot(
+    datos,
+    aes(
+      y = reorder(NOM_MUN_REAL, total),
+      x = total,
+      fill = factor(anio)
+    )
+  ) +
+    
+    geom_bar(
+      stat = "identity",
+      width = 0.7
+    ) +
+    
+    geom_text(
+      aes(label = comma(round(total))),
+      hjust = -0.1,
+      size = 2.5,
+      fontface = "bold"
+    ) +
+    
+    scale_fill_manual(values = paleta_seguridad) +
+    
+    scale_x_continuous(
+      labels = comma,
+      expand = expansion(mult = c(0,0.15))
+    ) +
+    
+    facet_wrap(
+      ~ anio,
+      ncol = 2
+    ) +
+    
+    labs(
+      title = paste0(
+        "Población de 18 años y más, por cada municipio del estado de Querétaro, que ",
+        tolower(cat),
+        "\na la escuela por temor a ser víctima de la delincuencia"
+      ),
+      subtitle = "Comparación municipal por año",
+      x = "Total de personas",
+      y = "Municipio"
+    ) +
+    
+    theme_minimal() +
+    
+    theme(
+      plot.title = element_text(
+        face = "bold",
+        size = 13,
+        hjust = 0.5
+      ),
+      
+      plot.subtitle = element_text(
+        size = 11,
+        hjust = 0.5,
+        color = "gray40"
+      ),
+      
+      strip.text = element_text(
+        face = "bold",
+        size = 11,
+        color = "white"
+      ),
+      
+      strip.background = element_rect(
+        fill = "#317C96"
+      ),
+      
+      axis.text.y = element_text(
+        size = 7,
+        face = "bold"
+      ),
+      
+      axis.text.x = element_text(size = 8),
+      
+      panel.grid.minor = element_blank(),
+      
+      panel.grid.major.y = element_blank(),
+      
+      legend.position = "none",
+      
+      plot.margin = margin(15,30,15,15)
+    )
+}
+
+# =========================
+# GRÁFICAS INDIVIDUALES
+# =========================
+
+# Sí dejó de asistir
+graficar_categoria_escuela("Sí dejó de asistir")
+
+# No dejó de asistir
+graficar_categoria_escuela("No dejó de asistir")
+```
+En general, la mayoría de las personas respondió que no dejó de asistir a la escuela por temor a la delincuencia; sin embargo, también existen municipios donde una parte de la población sí reportó haber abandonado temporalmente sus actividades escolares debido al miedo o a la percepción de inseguridad.
+
+Los municipios con mayor población suelen presentar cantidades más altas de personas en todas las categorías, especialmente en la respuesta de “no dejó de asistir”. Esto ocurre porque concentran un mayor número de habitantes y, por lo tanto, más respuestas dentro de la encuesta.
+
+En algunos municipios se observan valores más elevados en la categoría “sí dejó de asistir”, lo que puede reflejar mayores preocupaciones relacionadas con la seguridad, trayectos considerados peligrosos, poca iluminación, inseguridad en el transporte o temor a ser víctima de algún delito. Aunque en muchos casos las cantidades no son tan grandes en comparación con otras categorías, siguen siendo relevantes porque representan personas cuya educación se vio afectada por el miedo.
+
+También se pueden notar diferencias entre municipios urbanos y rurales. En ciertos municipios pequeños los valores son más bajos, mientras que en municipios con mayor actividad urbana la percepción de riesgo puede influir más en las decisiones cotidianas de la población.
+
+## [3.3 Robo de celular]{style="color:#444444; font-weight:bold;"}
+
+De acuerdo con la metodología de la ENVIPE, este tipo de incidentes se clasifica dentro de la victimización personal. Esto refleja que el celular es uno de los bienes más vulnerables al tratarse de un objeto de uso cotidiano, portátil y de fácil comercialización, por lo que suele ser un objetivo frecuente en delitos contra el patrimonio.
+
+```{r}
+
+procesar_solo_celular <- function(ruta, anio) {
+  
+  tmod_vic <- read.csv(
+    file.path(ruta, "TMod_Vic.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(tmod_vic) <- toupper(names(tmod_vic))
+  
+  tmod_vic <- tmod_vic %>%
+    mutate(
+      BPCOD = sprintf("%02d", as.integer(BPCOD)),
+      FAC_DEL = as.numeric(FAC_DEL),
+      BP3_1_09 = as.numeric(BP3_1_09),
+      CVE_ENT = substr(sprintf("%07d", as.numeric(UPM)), 1, 2)
+    )
+  
+  solo_celular_base <- tmod_vic %>%
+    filter(
+      BPCOD == "05",
+      BP3_1_09 == 1
+    ) %>%
+    group_by(CVE_ENT) %>%
+    summarise(
+      total = sum(FAC_DEL, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  solo_celular <- procesar(
+    solo_celular_base,
+    "",
+    "Solo celular",
+    "¿Cuántos robos o asaltos correspondieron únicamente al robo de teléfono celular?"
+  )
+  
+  solo_celular %>%
+    mutate(anio = anio)
+}
+
+tabla_solo_celular <- bind_rows(
+  lapply(2021:2025, function(a) {
+    procesar_solo_celular(file.path(base_dir, a), a)
+  })
+)
+
+tabla_plot_celular <- tabla_solo_celular %>%
+  filter(
+    indicador == "Solo celular",
+    Estado == "Querétaro"
+  ) %>%
+  mutate(
+    total_num = as.numeric(total)
+  )
+
+ggplot(tabla_plot_celular,
+       aes(x = factor(anio), y = total_num)) +
+  
+  geom_segment(
+    aes(x = factor(anio),
+        xend = factor(anio),
+        y = 0,
+        yend = total_num),
+    color = "#317C96",
+    linewidth = 1
+  ) +
+  
+  geom_point(
+    size = 6,
+    color = "#8DC63F"
+  ) +
+  
+  geom_text(
+    aes(label = comma(total_num)),
+    vjust = -1,
+    size = 3.5
+  ) +
+  
+  scale_y_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.15))
+  ) +
+  
+  labs(
+    title = "robos o asaltos en la calle o transporte público correspondieron al robo únicamente de teléfono celular en Querétaro",
+    x = "Año",
+    y = "Total de delitos"
+  ) +
+  
+  theme_minimal()
+
+```
+Asimismo, los datos incluyen la suma de los delitos de robo o asalto en la calle o transporte público captados por la encuesta, hayan sido o no denunciados ante el Ministerio Público o Fiscalía Estatal. También se consideran los casos en los que el (la) informante seleccionó la opción “Nada”, e incluye robo relacionado con una visita a un banco o cajero automático.
+
+## [4. Estrategias de prevención y respuesta comunitaria]{style="color:#1F4E79; font-weight:bold;"}
+
+## [4.1 Adquirir un Perro guardián]{style="color:#444444; font-weight:bold;"}
+
+Las gráficas muestran una respuesta concreta de los hogares ante su entorno social en Querétaro. La decisión de comprar un perro guardián puede interpretarse como una estrategia de protección dentro del contexto de la Delincuencia, fenómeno social constituido por el conjunto de actos delictivos que se cometen de manera dolosa en un tiempo y lugar determinados. Este comportamiento refleja cómo las familias adaptan sus acciones según las condiciones de seguridad percibidas en su comunidad(Cada hogar puede decidir tomar mas de una medida de proteccion ademas de esta como cambiar puertas o ventanas,colocar rejas o bardas, colocar candados,ect).
+
+```{r}
+
+# =========================
+# PERRO GUARDIÁN
+# =========================
+
+procesar_perro_guardian <- function(ruta, anio) {
+  
+  tper_vic1 <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(tper_vic1) <- toupper(names(tper_vic1))
+  
+  tper_vic1 <- tper_vic1 %>%
+    
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      FAC_HOG = as.numeric(FAC_HOG)
+    )
+  
+  perro_base <- tper_vic1 %>%
+    
+    filter(AP4_11_08 == 1) %>%
+    
+    group_by(CVE_ENT) %>%
+    
+    summarise(
+      total = sum(FAC_HOG, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  perro <- procesar(
+    perro_base,
+    "Sí",
+    "Perro guardián",
+    "¿Cuántos hogares adoptaron la medida de comprar un perro guardián para protegerse de la delincuencia?"
+  )
+  
+  perro %>%
+    mutate(anio = anio)
+}
+
+# =========================
+# TABLA GENERAL
+# =========================
+
+tabla_perro_guardian <- bind_rows(
+  
+  lapply(2021:2025, function(a)
+    
+    procesar_perro_guardian(
+      file.path(base_dir, a),
+      a
+    )
+  )
+)
+
+# =========================
+# TABLA PARA GRÁFICA
+# =========================
+
+tabla_plot_perro <- tabla_perro_guardian %>%
+  
+  filter(
+    indicador == "Perro guardián",
+    Estado == "Querétaro"
+  ) %>%
+  
+  mutate(
+    total_num = as.numeric(total),
+    anio = factor(anio)
+  )
+
+# =========================
+# GRÁFICA
+# =========================
+
+ggplot(
+  tabla_plot_perro,
+  
+  aes(
+    x = anio,
+    y = total_num,
+    fill = anio
+  )
+) +
+  
+  geom_bar(
+    stat = "identity",
+    width = 0.7
+  ) +
+  
+  geom_text(
+    aes(label = comma(round(total_num))),
+    
+    vjust = -0.3,
+    
+    size = 3.5
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      "#1b4f72",
+      "#2874a6",
+      "#5499c7",
+      "#76d7c4",
+      "#f4d03f"
+    )
+  ) +
+  
+  scale_y_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0, 0.12))
+  ) +
+  
+  labs(
+    title = "Hogares que compraron un perro guardián para protegerse de la delincuencia en Querétaro",
+    
+    x = "Año",
+    
+    y = "Total de hogares"
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    legend.position = "none",
+    
+    plot.title = element_text(
+      face = "bold",
+      size = 14
+    )
+  )
+
+```
+Asimismo, los datos pueden relacionarse con el temor, entendido como el sentimiento de inseguridad que experimenta la población ante una posible amenaza. Aunque no todas las personas hayan sido víctimas directas, la percepción de riesgo influye en la toma de decisiones. Esto demuestra que la sensación de inseguridad también genera cambios en la vida cotidiana de los hogares.
+```{r}
+
+# =========================
+# PERRO GUARDIÁN POR MUNICIPIO
+# =========================
+
+procesar_perro_municipio <- function(ruta, anio) {
+  
+  df <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(df) <- toupper(names(df))
+  
+  df <- df %>%
+    
+    mutate(
+      CVE_ENT = sprintf("%02d", as.integer(CVE_ENT)),
+      CVE_MUN = sprintf("%03d", as.integer(CVE_MUN)),
+      FAC_HOG = as.numeric(FAC_HOG)
+    )
+  
+  datos <- df %>%
+    
+    filter(
+      CVE_ENT == "22",
+      AP4_11_08 == 1
+    ) %>%
+    
+    group_by(CVE_MUN) %>%
+    
+    summarise(
+      total = sum(FAC_HOG, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  catalogo_municipios_qro %>%
+    
+    left_join(datos, by = "CVE_MUN") %>%
+    filter(NOM_MUN_REAL %in% municipios_envipe) %>%
+    mutate(
+      total = replace_na(total, 0),
+      anio = factor(anio)
+    )
+}
+
+# =========================
+# TABLA GENERAL
+# =========================
+
+tabla_perro_municipio <- bind_rows(
+  
+  lapply(2021:2025, function(a)
+    
+    procesar_perro_municipio(
+      file.path(base_dir, a),
+      a
+    )
+  )
+)
+
+# =========================
+# GRÁFICA
+# =========================
+
+ggplot(
+  tabla_perro_municipio,
+  
+  aes(
+    x = reorder(NOM_MUN_REAL, total),
+    y = total,
+    group = anio,
+    color = anio
+  )
+) +
+  
+  geom_line(
+    linewidth = 1
+  ) +
+  
+  geom_point(
+    size = 3
+  ) +
+  
+  scale_y_continuous(
+    labels = comma
+  ) +
+  
+  labs(
+    title = "Hogares que compraron un perro guardián para protegerse de la delincuencia en por municipio",
+    
+    x = "Municipio",
+    
+    y = "Total de hogares",
+    
+    color = "Año"
+  ) +
+  
+  theme_minimal() +
+  
+  theme(
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1
+    ),
+    
+    plot.title = element_text(
+      face = "bold",
+      size = 14
+    )
+  )
+
+```
+Finalmente, estas gráficas pueden vincularse con la Prevención de la violencia y/o la delincuencia, ya que prevenir implica anticiparse a posibles daños y actuar con anticipación. La adquisición de un perro guardián representa una medida preventiva individual que busca disminuir el riesgo y sus consecuencias. De esta manera, se observa cómo las familias implementan acciones para fortalecer su seguridad frente a posibles situaciones de peligro.
+
+## [4.2 Organización vecinal por alumbrado]{style="color:#444444; font-weight:bold;"}
+
+Un entorno iluminado es una de las primeras barreras físicas contra la delincuencia. Cuando el alumbrado público falla, aumenta la percepción de inseguridad y se pone a prueba la capacidad de respuesta y organización de la propia comunidad.
+
+A continuación, se presenta la evolución histórica (2021-2025) a nivel estatal en Querétaro de dos indicadores clave: el volumen total de personas de 18 años y más que sufren por la falta de luminarias en su colonia y, de ellos, qué porcentaje decidió organizarse con sus vecinos para solucionar el problema.
+
+```{r, fig.width=10, fig.height=8}
+# =========================
+# 1. FUNCIÓN ALUMBRADO ESTATAL 
+# =========================
+procesar_alumbrado_estado <- function(ruta, anio) {
+  
+  df <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(df) <- toupper(names(df))
+  
+  # variables por diferencias entre años (AP4_2_02 vs AP4_2_2)
+  if (!"AP4_2_2" %in% names(df) & "AP4_2_02" %in% names(df)) df$AP4_2_2 <- df$AP4_2_02
+  if (!"AP4_3_2" %in% names(df) & "AP4_3_02" %in% names(df)) df$AP4_3_2 <- df$AP4_3_02
+  
+  # Creamos un identificador único por persona para evitar duplicados por delitos
+  if (!"ID_PER" %in% names(df)) {
+    df <- df %>% mutate(ID_PER = paste(VIV_SEL, HOGAR, R_SEL, sep = "_"))
+  }
+  
+  df_limpio <- df %>%
+    filter(sprintf("%02d", as.integer(CVE_ENT)) == "22") %>%
+    mutate(FAC_ELE = as.numeric(FAC_ELE)) %>%
+    # Agrupamos por persona para eliminar cualquier fila repetida en la tabla
+    group_by(ID_PER) %>%
+    summarise(
+      AP4_2_2 = first(AP4_2_2),
+      AP4_3_2 = first(AP4_3_2),
+      FAC_ELE = first(FAC_ELE),
+      .groups = "drop"
+    )
+  
+  df_limpio %>%
+    summarise(
+      total_afectados = sum(FAC_ELE[AP4_2_2 == 1], na.rm = TRUE),
+      se_organizaron  = sum(FAC_ELE[AP4_2_2 == 1 & AP4_3_2 == 1], na.rm = TRUE)
+    ) %>%
+    mutate(
+      # % de los afectados que se organizaron
+      pct_organizados  = (se_organizaron / total_afectados) * 100,
+      anio = anio
+    )
+}
+
+# =========================
+# 2. CONSTRUCCIÓN DE LA TABLA HISTÓRICA
+# =========================
+tabla_alumbrado <- bind_rows(
+  lapply(2021:2025, function(a)
+    procesar_alumbrado_estado(file.path(base_dir, a), a)
+  )
+)
+
+# Reestructuramos la tabla y ordenamos los factores 
+tabla_alumbrado_long <- tabla_alumbrado %>%
+  select(anio, total_afectados, pct_organizados) %>%
+  pivot_longer(
+    cols = c(total_afectados, pct_organizados),
+    names_to = "indicador",
+    values_to = "valor"
+  ) %>%
+  mutate(
+    indicador = case_when(
+      indicador == "total_afectados" ~ "Total de personas afectadas por falta de alumbrado",
+      indicador == "pct_organizados"  ~ "Porcentaje de afectados que se organizaron con sus vecinos"
+    ),
+    # Primero el Total, luego el Porcentaje
+    indicador = factor(
+      indicador, 
+      levels = c(
+        "Total de personas afectadas por falta de alumbrado",
+        "Porcentaje de afectados que se organizaron con sus vecinos"
+      )
+    ),
+    # Pre-calculamos las etiquetas según el tipo de indicador
+    etiqueta = case_when(
+      grepl("Total", indicador) ~ comma(round(valor)),
+      grepl("Porcentaje", indicador) ~ paste0(round(valor, 1), "%")
+    )
+  )
+
+# =========================
+# 3. GRÁFICA DE TENDENCIA HISTÓRICA EN DOS PANELES 
+# =========================
+ggplot(
+  tabla_alumbrado_long, 
+  aes(
+    x = factor(anio), 
+    y = valor, 
+    group = indicador, 
+    color = indicador
+  )
+) +
+  geom_line(linewidth = 1.3, show.legend = FALSE) +
+  geom_point(size = 3.5, show.legend = FALSE) +
+  
+  # etiquetas personalizadas encima de cada punto
+  geom_text(
+    aes(label = etiqueta),
+    vjust = -1.3,
+    size = 3.5,
+    fontface = "bold",
+    show.legend = FALSE
+  ) +
+  
+  # Separamos en dos páneles con escalas independientes (el orden lo dicta el factor)
+  facet_wrap(~indicador, scales = "free_y", ncol = 1) +
+  
+  # Azul rey para los totales (arriba), Verde bandera para los porcentajes (abajo)
+  scale_color_manual(values = c("#1f77b4", "#2e7d32")) +
+  
+  scale_y_continuous(
+    labels = comma,
+    expand = expansion(mult = c(0.15, 0.25)) # Espacio para que no se corten los textos superiores
+  ) +
+  
+  labs(
+    title = "Falta de alumbrado público y respuesta ciudadana en Querétaro",
+    subtitle = "Evolución del total de personas afectadas y el porcentaje de organización vecinal (2021-2025)",
+    x = "Año de la encuesta",
+    y = "Valor (Personas / Porcentaje)"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    strip.text = element_text(face = "bold", size = 11, color = "#333333"),
+    strip.background = element_rect(fill = "#f5f5f5", color = NA),
+    axis.text = element_text(size = 10, face = "bold"),
+    axis.title.x = element_text(face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(face = "bold", margin = margin(r = 10)),
+    plot.title = element_text(face = "bold", size = 14, color = "#1a1a1a"),
+    plot.subtitle = element_text(size = 11, face = "italic", color = "#555555"),
+    panel.grid.minor = element_blank(),
+    panel.spacing = unit(1.5, "lines") # Espacio entre los dos paneles
+  )
+```
+A continuación, se presenta el panorama detallado para el año 2025 por municipio, contrastando el volumen total de personas afectadas por la falta de alumbrado frente al porcentaje de dicha población que logró organizarse para resolverlo.
+
+```{r, fig.width=12, fig.height=9}
+# =========================
+# 1. FUNCIÓN ALUMBRADO MUNICIPAL (2025)
+# =========================
+procesar_alumbrado_muni_2025 <- function(ruta) {
+  
+  df <- read.csv(
+    file.path(ruta, "TPer_Vic1.csv"),
+    stringsAsFactors = FALSE
+  )
+  
+  names(df) <- toupper(names(df))
+  
+  # Homologamos variables
+  if (!"AP4_2_2" %in% names(df) & "AP4_2_02" %in% names(df)) df$AP4_2_2 <- df$AP4_2_02
+  if (!"AP4_3_2" %in% names(df) & "AP4_3_02" %in% names(df)) df$AP4_3_2 <- df$AP4_3_02
+  
+  # Identificador único para limpiar duplicados por delitos
+  if (!"ID_PER" %in% names(df)) {
+    df <- df %>% mutate(ID_PER = paste(VIV_SEL, HOGAR, R_SEL, sep = "_"))
+  }
+  
+  df_limpio <- df %>%
+    filter(sprintf("%02d", as.integer(CVE_ENT)) == "22") %>%
+    mutate(
+      CVE_MUN = sprintf("%03d", as.integer(CVE_MUN)),
+      FAC_ELE = as.numeric(FAC_ELE)
+    ) %>%
+    group_by(ID_PER) %>%
+    summarise(
+      CVE_MUN = first(CVE_MUN),
+      AP4_2_2 = first(AP4_2_2),
+      AP4_3_2 = first(AP4_3_2),
+      FAC_ELE = first(FAC_ELE),
+      .groups = "drop"
+    )
+  
+  # Agrupamos por municipio para obtener los totales y proporciones
+  datos_muni <- df_limpio %>%
+    group_by(CVE_MUN) %>%
+    summarise(
+      total_afectados = sum(FAC_ELE[AP4_2_2 == 1], na.rm = TRUE),
+      se_organizaron  = sum(FAC_ELE[AP4_2_2 == 1 & AP4_3_2 == 1], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      pct_organizados = (se_organizaron / total_afectados) * 100,
+      pct_organizados = replace_na(pct_organizados, 0)
+    )
+  
+  # Unimos con el catálogo oficial de municipios de Querétaro
+  catalogo_municipios_qro %>%
+    left_join(datos_muni, by = "CVE_MUN") %>%
+    filter(NOM_MUN_REAL %in% municipios_envipe) %>%
+    mutate(
+      total_afectados = replace_na(total_afectados, 0),
+      pct_organizados = replace_na(pct_organizados, 0)
+    )
+}
+
+# =========================
+# 2. CARGA DE DATOS (AÑO 2025)
+# =========================
+
+tabla_muni_2025 <- procesar_alumbrado_muni_2025(file.path(base_dir, 2025))
+
+# Pasamos a formato largo para poder hacer las barras agrupadas
+tabla_muni_long <- list(
+  tabla_muni_2025 %>% 
+    select(NOM_MUN_REAL, valor = total_afectados) %>% 
+    mutate(indicador = "Total de personas afectadas", tipo = "Cantidad"),
+  tabla_muni_2025 %>% 
+    select(NOM_MUN_REAL, valor = pct_organizados) %>% 
+    mutate(indicador = "Porcentaje de vecinos organizados", tipo = "Porcentaje")
+) %>% 
+  bind_rows() %>%
+  mutate(
+    # Generamos la etiqueta formateada correctamente para cada tipo de barra
+    etiqueta = if_else(tipo == "Cantidad", comma(round(valor)), paste0(round(valor, 1), "%"))
+  )
+
+# =========================
+# 3. GRÁFICA: BARRAS AGRUPADAS MUNICIPALES
+# =========================
+ggplot(
+  tabla_muni_long,
+  aes(
+    y = reorder(NOM_MUN_REAL, valor, FUN = max), # Ordenamos por el tamaño del problema
+    x = valor,
+    fill = indicador
+  )
+) +
+  # Barras juntas por municipio (position_dodge)
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  
+  # Etiquetas numéricas al final de cada barra
+  geom_text(
+    aes(label = etiqueta),
+    position = position_dodge(width = 0.8),
+    hjust = -0.15,
+    size = 2.8,
+    fontface = "bold"
+  ) +
+  
+  # Colores institucionales: Azul para el problema, Verde para la solución
+  scale_fill_manual(values = c("#1f77b4", "#2e7d32")) +
+  
+  # Dejamos libre el eje X ya que conviven números absolutos y porcentajes
+  scale_x_continuous(labels = comma, expand = expansion(mult = c(0, 0.15))) +
+  
+  labs(
+    title = "Falta de alumbrado vs. Organización comunitaria por municipio",
+    subtitle = "Comparativa entre la cantidad de afectados y el porcentaje de respuesta vecinal (Corte 2025)",
+    x = "Valor (Cantidad absoluta / Porcentaje)",
+    y = "Municipio",
+    fill = "Indicador municipal:"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold", size = 10),
+    axis.text.y = element_text(size = 9, face = "bold"),
+    axis.text.x = element_text(size = 9),
+    axis.title = element_text(face = "bold"),
+    plot.title = element_text(face = "bold", size = 14, color = "#1a1a1a"),
+    plot.subtitle = element_text(size = 11, face = "italic", color = "#555555"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank() # Quitamos líneas horizontales para limpiar el pasillo de barras
+  )
+```
+Al cruzar los años con el mapa de los municipios, descubrimos dos realidades completamente opuestas en el estado:
+
+* **El reto de las grandes ciudades:** En zonas metropolitanas altamente pobladas (como Querétaro, San Juan del Río y El Marqués), el volumen de personas afectadas es masivo, pero la iniciativa comunitaria es notablemente baja.
+
+* **La fuerza de las comunidades pequeñas:** En contraste, aunque el problema de iluminación les afecte a menor escala, la cercanía entre los habitantes facilita que se pongan de acuerdo rápidamente, formen comités y resuelvan sus necesidades colectivas de manera directa.
+
+## [5. Conclusiones]{style="color:#1F4E79; font-weight:bold;"}
+
+El análisis de las diez preguntas seleccionadas en esta investigación demuestra que la seguridad pública no puede medirse únicamente a través de las tasas de homicidios o delitos de alto impacto. La verdadera dimensión del problema se vive en el desgaste silencioso de la rutina de los ciudadanos: en el transporte público, en las aulas, en los espacios de trabajo y al caer la noche.
+
+A partir de los hallazgos obtenidos, es posible sintetizar la realidad del entorno delictivo y social en tres grandes pilares:
+
+* **1.** La privatización de la seguridad y la pérdida de libertades cotidianas
+Los datos de 2024 revelan un impacto directo en el bolsillo y el desarrollo de los mexicanos. Por un lado, la delincuencia de alta frecuencia —representada masivamente por el robo exclusivo de teléfonos celulares en la calle y el transporte— obliga a la sociedad a modificar su entorno doméstico, traduciéndose en gastos preventivos como la adopción de perros guardianes para blindar el hogar.
+
+El costo más grave, sin embargo, no es económico sino humano: cuando una parte de la población deja de asistir a la escuela por temor a la delincuencia, el miedo deja de ser una sensación y se convierte en un freno para el desarrollo educativo y el futuro de los jóvenes del país.
+
+* **2.** Los espacios de vulnerabilidad: El trabajo, la noche y la calle
+El diagnóstico de percepción de 2025 enciende alarmas sobre los lugares donde pasamos la mayor parte del tiempo. La delincuencia ha logrado traspasar las fronteras de lo privado: una porción significativa de la población ocupada percibe su propio espacio laboral como un entorno inseguro, restándole bienestar a la actividad productiva.
+
+Esta vulnerabilidad se agudiza drásticamente al caer el sol. El miedo generalizado a caminar solos por la noche en los alrededores de la vivienda está íntimamente ligado a las deficiencias de infraestructura. Aquí, el caso de Querétaro resulta emblemático: demuestra que la falta de alumbrado público actúa como el primer detonante de la percepción de riesgo, pero también pone a prueba el tejido social, sirviendo como un catalizador para que los vecinos decidan organizarse de forma autónoma ante la ausencia de soluciones inmediatas.
+
+* **3.** El dilema institucional: Confianza vecinal, corrupción y fuerzas federales
+El cierre del periodo de estudio en 2025 nos muestra una sociedad civil que navega entre la desconfianza institucional y el refugio comunitario. Mientras que la corrupción se mantiene firmemente en la mente de los ciudadanos como uno de los problemas prioritarios y más preocupantes en la mayoría de las entidades federativas, la población busca equilibrios:
+
+Por un lado, la confianza depositada en los propios vecinos se convierte en la primera red de seguridad y apoyo ante la delincuencia local.
+
+Por el otro, a nivel macro, la Guardia Nacional retiene un voto de confianza importante al ser percibida por la mayoría como una institución dispuesta a ayudar, consolidándose como el principal bastión de legitimidad del Estado en el territorio.
+
+## [6. Referencias]{style="color:#1F4E79; font-weight:bold;"}
+
+2021
+Instituto Nacional de Estadística y Geografía (INEGI). (2021). Encuesta Nacional de Victimización y Percepción sobre Seguridad Pública (ENVIPE) 2021. https://www.inegi.org.mx/programas/envipe/2021/
+
+
+2022
+Instituto Nacional de Estadística y Geografía (INEGI). (2022). Encuesta Nacional de Victimización y Percepción sobre Seguridad Pública (ENVIPE) 2022. https://www.inegi.org.mx/programas/envipe/2022/
+
+
+2023
+Instituto Nacional de Estadística y Geografía (INEGI). (2023). Encuesta Nacional de Victimización y Percepción sobre Seguridad Pública (ENVIPE) 2023. https://www.inegi.org.mx/programas/envipe/2023/
+
+
+2024
+Instituto Nacional de Estadística y Geografía (INEGI). (2024). Encuesta Nacional de Victimización y Percepción sobre Seguridad Pública (ENVIPE) 2024. https://www.inegi.org.mx/programas/envipe/2024/
+ 
+ 
+2025
+Instituto Nacional de Estadística y Geografía (INEGI). (2025). Encuesta Nacional de Victimización y Percepción sobre Seguridad Pública (ENVIPE) 2025. https://www.inegi.org.mx/programas/envipe/2025/
